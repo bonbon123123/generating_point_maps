@@ -1,3 +1,3 @@
-To use type "python main.py" in console
+To use type "python main.py" in the console
 
-i window that will pop up pres left mouse button to start generating maps
+i window that will pop up press the left mouse button to start generating maps
