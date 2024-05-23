@@ -71,27 +71,87 @@ def jarvis_marszuje(points,mapEditor,land_to_grow=None):
         land = Land(hull)
         mapEditor.add_land(land)
     else:
-        print("mamy land do rosnięcia")
-        land_to_grow.grow_land(hull)
-    # for point in hull:
-    #     point.color="green"
-    #     mapEditor.add_point(point)
-    #
-    # for i in range(len(hull)):
-    #     mapEditor.add_line(hull[i], hull[(i + 1) % len(hull)])
+        land_to_grow[0].grow_land(hull)
 
-class Land:
-    def __init__(self, points):
-        self.points = points
-        self.lines = []
-        for i in range(len(points)):
-            self.lines.append(Line(points[i], points[(i + 1) % len(points)]))
 
-    def add_line(self, line):
-        self.lines.append(line)
+def jarvis_marszuje_mini(points):
+    n = len(points)
+    if n < 3:
+        return points
 
-    def add_point(self, point):
-        self.points.append(point)
+    leftmost_index = 0
+    for i in range(1, n):
+        if points[i].x < points[leftmost_index].x:
+            leftmost_index = i
+
+    hull = []
+    p = leftmost_index
+    while True:
+        hull.append(points[p])
+        q = (p + 1) % n
+        for i in range(n):
+            if orientation(points[p], points[q], points[i]) == -1:
+                q = i
+        p = q
+        if p == leftmost_index:
+            break
+
+    return hull
+
+def is_convex(points):
+    """Sprawdza, czy dana otoczka jest wypukła."""
+    n = len(points)
+    if n < 3:
+        return True
+
+    prev_orientation = 0
+    for i in range(n):
+        p = points[i]
+        q = points[(i + 1) % n]
+        r = points[(i + 2) % n]
+        orientation_val = orientation(p, q, r)
+
+        if orientation_val != 0:
+            if prev_orientation == 0:
+                prev_orientation = orientation_val
+            elif prev_orientation != orientation_val:
+                return False
+
+    return True
+
+def fix_to_convex(points):
+    """Usuwa punkty wklęsłe, aż otoczka stanie się wypukła."""
+    n = len(points)
+    if n < 3:
+        return points
+
+    i = 0
+    while i < n:
+        p = points[i]
+        q = points[(i + 1) % n]
+        r = points[(i + 2) % n]
+
+        if orientation(p, q, r) == -1:
+            points.pop((i + 1) % n)
+            n -= 1
+            i = 0  # Restart the process as the list has changed
+        else:
+            i += 1
+
+    return points
+
+def calculate_polygon_area(points):
+    n = len(points)
+    if n < 3:
+        return 0  # Pole wielokąta o mniej niż 3 punktach jest zerowe
+
+    area = 0
+    for i in range(n):
+        j = (i + 1) % n  # Następny punkt (i+1), ostatni punkt łączy się z pierwszym
+        area += points[i].x * points[j].y
+        area -= points[i].y * points[j].x
+
+    return abs(area) / 2
 
 class Land:
     def __init__(self, points):
@@ -107,52 +167,169 @@ class Land:
         self.points.append(point)
 
     def grow_land(self, hull):
-        common_points = [p for p in hull if p in self.points]
+        common_points = []
         for point in hull:
             for point1 in self.points:
-                if(point.x==point1.x and point.y==point1.y ):
-                    print(point.x,point.y)
-        print("nie moje punkty:")
-        for point1 in hull:
-            print(point1.x,point1.y)
-        print("moje punkty:")
-        for point1 in self.points:
-            print(point1.x,point1.y)
-        if len(common_points) == 1 or len(common_points) == 2:
+                if point.x == point1.x and point.y == point1.y:
 
-            for point in hull:
-                print("point.x:")
-                print(point.x)
+                    common_points.append(point)
 
-                if point not in self.points:
-                    index = self.points.index(common_points[-1]) + 1
-                    self.points.insert(index, point)
-        else:
+        if len(common_points) == 1:
+            print(1)
+            land_common = self.points.index(common_points[0])
+            hull_common = hull.index(common_points[0])
+            self.points[land_common].color = "yellow"
+            self.points.pop(land_common)
+            hull.pop(hull_common)
+
+            new_points = hull[hull_common :] + hull[:hull_common]
+
+            self.points = self.points[:land_common] + new_points + self.points[land_common:]
+            #self.points= fix_to_convex(self.points)
+            self.lines = []
+            for i in range(len(self.points)):
+                self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
+
+        elif len(common_points) >= 2:
+            print(f"Found {len(common_points)} common points")
             first_common = self.points.index(common_points[0])
             last_common = self.points.index(common_points[-1])
+            first_hull_common = hull.index(common_points[0])
+            last_hull_common = hull.index(common_points[-1])
 
-            new_points = []
-            for point in hull:
-                print("point.x:")
-                print(point.x)
-                if point not in self.points:
-                    new_points.append(point)
+            # Adjust the color for visualization purposes
+            self.points[first_common].color = "yellow"
+            self.points[last_common].color = "yellow"
 
-            self.points = self.points[:first_common + 1] + new_points + self.points[last_common:]
+            if first_hull_common < last_hull_common:
+                area1 = calculate_polygon_area(hull[first_hull_common:last_hull_common])
+                area2 = calculate_polygon_area(hull[last_hull_common:] + hull[:first_hull_common])
+                if(area1 > area2):
+                    new_points=hull[first_hull_common:last_hull_common]
+                else:
+                    new_points=hull[last_hull_common:] + hull[:first_hull_common]
+            else:
+                area1 = calculate_polygon_area(hull[last_hull_common:first_hull_common])
+                area2 = calculate_polygon_area(hull[first_hull_common:] + hull[:last_hull_common])
+                if(area1 > area2):
+                    new_points=hull[last_hull_common:first_hull_common]
+                else:
+                    new_points=hull[first_hull_common:] + hull[:last_hull_common]
 
-        self.lines = []
-        for i in range(len(self.points)):
-            self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
+            self.points = [i for i in self.points if i not in common_points]
+            for point in reversed(new_points):
+                self.points.insert(first_common,point)
+            self.lines = []
+            for i in range(len(self.points)):
+                self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
+
+
+            # area1 = calculate_polygon_area(self.points[first_common + 1:last_common])
+            # area2 = calculate_polygon_area(self.points[last_common + 1:first_common])
+            # if(area1 > area2):
+            #     print("area1")
+            #     for point in self.points[first_common + 1:last_common]:
+            #         point.color="pink"
+            #     for point in self.points[last_common + 1:first_common]:
+            #         point.color="brown"
+            # else:
+            #     print("area2")
+            #     for point in self.points[first_common + 1:last_common]:
+            #         point.color="brown"
+            #     for point in self.points[last_common + 1:first_common]:
+            #         point.color="pink"
+            #
+            # area1 = calculate_polygon_area(hull[first_hull_common + 1:last_hull_common])
+            # area2 = calculate_polygon_area(hull[last_hull_common + 1:first_hull_common])
+            # if(area1 > area2):
+            #     for point in hull[first_hull_common + 1:last_hull_common]:
+            #         point.color="pink"
+            #     for point in hull[last_hull_common + 1:first_hull_common]:
+            #         point.color="brown"
+            # else:
+            #     for point in hull[first_hull_common + 1:last_hull_common]:
+            #         point.color="brown"
+            #     for point in hull[last_hull_common + 1:first_hull_common]:
+            #         point.color="pink"
 
 
 
-def update_land(self, map_editor):
-        for line in self.lines:
-            map_editor.add_line(line.p1, line.p2)
 
-        for point in self.points:
-            point.color = "green"
-            map_editor.add_point(point)
+            #self.points.insert(first_common,)
+
+            # new_points = hull[:first_hull_common + 1]+hull[last_hull_common-1:]
+            # new_points = hull[first_hull_common + 1:]+hull[:last_hull_common-1]
+            # new_points = []
+            #
+            #
+            # # Points from self.points before first_common
+            # new_points.extend(self.points[:first_common + 1])
+            #
+            # # Determine which segment of hull to add (either clockwise or counterclockwise)
+            # # if first_hull_common < last_hull_common:
+            # #     new_points.extend(hull[first_hull_common + 1:last_hull_common])
+            # # else:
+            # #     new_points.extend(hull[first_hull_common + 1:] + hull[:last_hull_common])
+            #
+            # # Points from self.points after last_common
+            # new_points.extend(self.points[last_common:])
+            #
+            # self.points = new_points
+            #
+            #
+            # self.lines = []
+            # for i in range(len(self.points)):
+            #     self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
+
+
+        # if len(common_points) == 2:
+        #     print("doing 2")
+        #     first_common = self.points.index(common_points[0])
+        #     last_common = self.points.index(common_points[-1])
+        #     # first_common2 = hull.index(common_points[0])
+        #     # last_common2 = hull.index(common_points[-1])
+        #
+        #     self.points[first_common].color="yellow"
+        #     self.points[last_common].color="yellow"
+        #
+        #     for point in self.points[:first_common +1]:
+        #         point.color="pink"
+        #
+        #     for point in self.points[last_common: -1]:
+        #         point.color="brown"
+        #
+        #     new_points = hull[hull_common :] + hull[:hull_common]
+        #
+        #     self.points = self.points[:first_common + 1] + new_points + self.points[last_common:]
+        #
+        #     self.lines = []
+        #     for i in range(len(self.points)):
+        #         self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
+
+        # if len(common_points) == 1 or len(common_points) == 2:
+        #     for point in hull:
+        #         if point not in self.points:
+        #             index = self.points.index(common_points[-1]) + 1
+        #             self.points.insert(index, point)
+        #     self.lines = []
+        # else:
+        #     first_common = self.points.index(common_points[0])
+        #     last_common = self.points.index(common_points[-1])
+        #     first_common.color ="yellow"
+        #     last_common.color ="yellow"
+        #
+        #     new_points = []
+        #     for point in hull:
+        #         print("point.x:")
+        #         print(point.x)
+        #         if point not in self.points:
+        #             new_points.append(point)
+        #
+        #     self.points = self.points[:first_common + 1] + new_points + self.points[last_common: -1]
+        #
+        # self.lines = []
+        # for i in range(len(self.points)):
+        #     self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
 
 
 # def convex_hull(points,mapEditor):
@@ -191,7 +368,7 @@ class MapEditor:
     def __init__(self):
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.points = []
-        self.lines = []
+        #self.lines = []
         self.lands=[]
         self.plot_size = 1000
         self.search_range=100
@@ -208,8 +385,8 @@ class MapEditor:
 
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 
-    def add_line(self, p1, p2):
-        self.lines.append(Line(p1, p2))
+    # def add_line(self, p1, p2):
+    #     self.lines.append(Line(p1, p2))
 
     def add_point(self, p):
         self.points.append(p)
@@ -259,25 +436,27 @@ class MapEditor:
                     points_to_do.append(point)
 
             has_land_point = False
+            land_found=[]
             for land in self.lands:
                 for point in land.points:
                     distance = new_point.distance_from_other_point(point)
                     if distance <= self.search_range:
-                        print("znalezion")
-                        jarvis_marszuje(points_to_do,self,land)
+                        point.color="black"
+                        points_to_do.append(point)
+                        land_found.append(land)
                         has_land_point = True
-                        break
+
 
             if not has_land_point:
-                self.lines=[]
+                #self.lines=[]
                 jarvis_marszuje(points_to_do,self)
+            else:
+                jarvis_marszuje(points_to_do,self,land_found)
 
             for point in points_to_do:
                 if point in self.points:
                     self.points.remove(point)
 
-            self.lines=[]
-            jarvis_marszuje(points_to_do,self)
 
             self.update_map()
 
