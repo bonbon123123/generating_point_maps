@@ -29,8 +29,7 @@ class Line:
     def __repr__(self):
         return f"Points({self.p1}, {self.p2})"
     def intersects(self, other):
-        # Check if two line segments intersect
-        # Implement the line intersection logic
+        
         def orientation(p, q, r):
             val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
             if val == 0:
@@ -75,8 +74,7 @@ class Line:
         return False
 
     def intersection_point(self, other):
-        # Find the intersection point of two line segments
-        # Implement the logic to find the intersection point
+        
         def line_intersection(p1, p2, p3, p4):
             A1 = p2.y - p1.y
             B1 = p1.x - p2.x
@@ -86,7 +84,7 @@ class Line:
             C2 = A2 * p3.x + B2 * p3.y
             det = A1 * B2 - A2 * B1
             if det == 0:
-                return None  # Lines are parallel
+                return None  
             else:
                 x = (B2 * C1 - B1 * C2) / det
                 y = (A1 * C2 - A2 * C1) / det
