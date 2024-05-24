@@ -2,19 +2,97 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import sqrt
 import math
+import copy
 class Point:
     def __init__(self, x, y, color):
         self.x = x
         self.y = y
         self.color = color
+        self.failed_connections=0
 
     def distance_from_other_point(self, other_point):
         return sqrt((self.x - other_point.x) ** 2 + (self.y - other_point.y) ** 2)
 
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+    def __repr__(self):
+        return f"Point({self.x}, {self.y})"
+
 class Line:
-    def __init__(self, point1, point2):
+    def __init__(self, point1, point2,color="red"):
         self.p1 = point1
         self.p2 = point2
+        self.color=color
+    def __repr__(self):
+        return f"Points({self.p1}, {self.p2})"
+    def intersects(self, other):
+        # Check if two line segments intersect
+        # Implement the line intersection logic
+        def orientation(p, q, r):
+            val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
+            if val == 0:
+                return 0
+            return 1 if val > 0 else 2
+
+        def on_segment(p, q, r):
+            if (q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x) and
+                    q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y)):
+                return True
+            return False
+
+        o1 = orientation(self.p1, self.p2, other.p1)
+        o2 = orientation(self.p1, self.p2, other.p2)
+        o3 = orientation(other.p1, other.p2, self.p1)
+        o4 = orientation(other.p1, other.p2, self.p2)
+
+        if self.p1==other.p1:
+            return False
+        if self.p1==other.p2:
+            return False
+        if self.p2==other.p1:
+            return False
+        if self.p2==other.p2:
+            return False
+
+        if o1 != o2 and o3 != o4:
+            return True
+
+        if o1 == 0 and on_segment(self.p1, other.p1, self.p2):
+            return True
+
+        if o2 == 0 and on_segment(self.p1, other.p2, self.p2):
+            return True
+
+        if o3 == 0 and on_segment(other.p1, self.p1, other.p2):
+            return True
+
+        if o4 == 0 and on_segment(other.p1, self.p2, other.p2):
+            return True
+
+        return False
+
+    def intersection_point(self, other):
+        # Find the intersection point of two line segments
+        # Implement the logic to find the intersection point
+        def line_intersection(p1, p2, p3, p4):
+            A1 = p2.y - p1.y
+            B1 = p1.x - p2.x
+            C1 = A1 * p1.x + B1 * p1.y
+            A2 = p4.y - p3.y
+            B2 = p3.x - p4.x
+            C2 = A2 * p3.x + B2 * p3.y
+            det = A1 * B2 - A2 * B1
+            if det == 0:
+                return None  # Lines are parallel
+            else:
+                x = (B2 * C1 - B1 * C2) / det
+                y = (A1 * C2 - A2 * C1) / det
+                return Point(x, y,"yellow")
+
+        return line_intersection(self.p1, self.p2, other.p1, other.p2)
 
 class MapArea:
     def __init__(self, x, y, size):
@@ -45,7 +123,159 @@ def orientation(p, q, r):
     return 1 if val > 0 else -1
 
 
-def jarvis_marszuje(points,mapEditor,land_to_grow=None):
+
+
+
+
+class Land:
+    def __init__(self, points,color):
+        self.color=color
+        self.points = points
+        for point in self.points:
+            point.color=self.color
+        self.lines = []
+        for i in range(len(points)):
+            self.lines.append(Line(points[i], points[(i + 1) % len(points)],self.color))
+
+
+    def add_line(self, line):
+        self.lines.append(line)
+
+
+    def update_lines(self):
+        self.lines = []
+        for i in range(len(self.points)):
+            self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)],self.color))
+
+
+    def delete_point(self,point):
+        print("deleting")
+        self.points.remove(point)
+        self.points = sort_points(self.points)
+        self.update_lines()
+
+    def my_points(self,points):
+        return  [point for point in self.points if point in points]
+
+    def mini_grow(self, hull, points):
+        mutual_points = set(points) & set(hull)
+        combined_points = list(set(self.points.copy() + list(mutual_points)))
+        self.points = sort_points(combined_points)
+        for point in self.points:
+            point.color = self.color
+        self.update_lines()
+
+
+    def grow_land(self, hull, points_insie):
+        combined_points = list(set(self.points.copy() + hull.copy()))
+        mutual_points = set(self.points) & set(hull)
+        unique_points =  [point for point in combined_points if point not in mutual_points]
+        uniquer_points =  [point for point in unique_points if point not in points_insie]
+        self.points = sort_points(uniquer_points)
+        for point in self.points:
+            point.color=self.color
+        self.update_lines()
+
+def merge_lands(land1, land2):
+    hull_points = sort_points(list(set(land1.points + land2.points)))
+    merged_land = Land(hull_points, land1.color)
+    return merged_land
+
+
+def sort_points(points):
+    banned_lines=[]
+    banned_points=[]
+    if not points:
+        return []
+
+    def next_point(current_point, points, used_points):
+        min_distance = float('inf')
+        next_p = None
+        for p in points:
+            if (p != current_point) and (p not in used_points) and (p not in banned_points):
+                dist = current_point.distance_from_other_point(p)
+                if dist < min_distance:
+                    valid = True
+                    if len(banned_lines) > 0:
+                        for line in banned_lines:
+                            if (next_p is not None) and ((line.p1 == p and line.p2 == next_p) or (line.p2 == p and line.p1 == next_p)):
+                                valid = False
+                                break
+                    if valid:
+                        min_distance = dist
+                        next_p = p
+        return next_p
+
+
+    start_point = points[0]
+    i=0
+    thereIsIntersection=True
+    while thereIsIntersection:
+        used_points = set()
+        used_lines=[]
+        current_point = start_point
+        sorted_points = []
+        banned_points=[]
+
+
+        while len(sorted_points) < len(points) - len(banned_points):
+            sorted_points.append(current_point)
+            used_points.add(current_point)
+            next_p = next_point(current_point, points, used_points)
+            if next_p is None:
+                print("None")
+                current_point.failed_connections+=1
+                if(current_point).failed_connections==100:
+                    banned_points.append(banned_points)
+                    points.remove(current_point)
+                i+=1
+                if(i>len(points)):
+                    i=0
+                start_point = points[i]
+                break
+
+            used_lines.append(Line(current_point, next_p))
+            current_point = next_p
+        thereIsIntersection=False
+        used_lines.append(Line(sorted_points[0],sorted_points[-1]))
+        for line in used_lines:
+            for line2 in used_lines:
+                if line.intersects(line2):
+                    thereIsIntersection=True
+                    banned_lines.append(line)
+                    banned_lines.append(line2)
+                    break
+        # total_length = sum(line.p1.distance_from_other_point(line.p2) for line in used_lines)
+        # sus_lines=[]
+        # average_length = total_length / len(used_lines)
+        # for line in used_lines:
+        #     if line.p1.distance_from_other_point(line.p2) > average_length*2:
+        #         print("sus_lines1")
+        #         sus_lines.append(line)
+        # if len(sus_lines)>=2:
+        #     thereIsIntersection=True
+        #     if(sus_lines[0].p2==sus_lines[1].p1):
+        #         points.remove(sus_lines[0].p2)
+        #     else:
+        #         index = sorted_points.index(sus_lines[0].p2)
+        #         index2 = sorted_points.index(sus_lines[-1].p1)
+        #         points_to_remove = sorted_points[:index +1] + sorted_points[index2-1:]
+        #         if len(points_to_remove) <4:
+        #             for point in points_to_remove:
+        #                 points.remove(point)
+    return sorted_points
+
+
+
+
+
+
+
+
+
+
+def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
+    print("aktywowany")
     n = len(points)
     if n < 3:
         return points
@@ -68,307 +298,44 @@ def jarvis_marszuje(points,mapEditor,land_to_grow=None):
             break
 
     if land_to_grow==None:
-        land = Land(hull)
+        land = Land(hull,mapEditor.color)
         mapEditor.add_land(land)
     else:
-        land_to_grow[0].grow_land(hull)
-
-
-def jarvis_marszuje_mini(points):
-    n = len(points)
-    if n < 3:
-        return points
-
-    leftmost_index = 0
-    for i in range(1, n):
-        if points[i].x < points[leftmost_index].x:
-            leftmost_index = i
-
-    hull = []
-    p = leftmost_index
-    while True:
-        hull.append(points[p])
-        q = (p + 1) % n
-        for i in range(n):
-            if orientation(points[p], points[q], points[i]) == -1:
-                q = i
-        p = q
-        if p == leftmost_index:
-            break
-
-    return hull
-
-def is_convex(points):
-    """Sprawdza, czy dana otoczka jest wypukła."""
-    n = len(points)
-    if n < 3:
-        return True
-
-    prev_orientation = 0
-    for i in range(n):
-        p = points[i]
-        q = points[(i + 1) % n]
-        r = points[(i + 2) % n]
-        orientation_val = orientation(p, q, r)
-
-        if orientation_val != 0:
-            if prev_orientation == 0:
-                prev_orientation = orientation_val
-            elif prev_orientation != orientation_val:
-                return False
-
-    return True
-
-def fix_to_convex(points):
-    """Usuwa punkty wklęsłe, aż otoczka stanie się wypukła."""
-    n = len(points)
-    if n < 3:
-        return points
-
-    i = 0
-    while i < n:
-        p = points[i]
-        q = points[(i + 1) % n]
-        r = points[(i + 2) % n]
-
-        if orientation(p, q, r) == -1:
-            points.pop((i + 1) % n)
-            n -= 1
-            i = 0  # Restart the process as the list has changed
-        else:
-            i += 1
-
-    return points
-
-def calculate_polygon_area(points):
-    n = len(points)
-    if n < 3:
-        return 0  # Pole wielokąta o mniej niż 3 punktach jest zerowe
-
-    area = 0
-    for i in range(n):
-        j = (i + 1) % n  # Następny punkt (i+1), ostatni punkt łączy się z pierwszym
-        area += points[i].x * points[j].y
-        area -= points[i].y * points[j].x
-
-    return abs(area) / 2
-
-class Land:
-    def __init__(self, points):
-        self.points = points
-        self.lines = []
-        for i in range(len(points)):
-            self.lines.append(Line(points[i], points[(i + 1) % len(points)]))
-
-    def add_line(self, line):
-        self.lines.append(line)
-
-    def add_point(self, point):
-        self.points.append(point)
-
-    def grow_land(self, hull):
-        common_points = []
-        for point in hull:
-            for point1 in self.points:
-                if point.x == point1.x and point.y == point1.y:
-
-                    common_points.append(point)
-
-        if len(common_points) == 1:
-            print(1)
-            land_common = self.points.index(common_points[0])
-            hull_common = hull.index(common_points[0])
-            self.points[land_common].color = "yellow"
-            self.points.pop(land_common)
-            hull.pop(hull_common)
-
-            new_points = hull[hull_common :] + hull[:hull_common]
-
-            self.points = self.points[:land_common] + new_points + self.points[land_common:]
-            #self.points= fix_to_convex(self.points)
-            self.lines = []
-            for i in range(len(self.points)):
-                self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
-
-        elif len(common_points) >= 2:
-            print(f"Found {len(common_points)} common points")
-            first_common = self.points.index(common_points[0])
-            last_common = self.points.index(common_points[-1])
-            first_hull_common = hull.index(common_points[0])
-            last_hull_common = hull.index(common_points[-1])
-
-            # Adjust the color for visualization purposes
-            self.points[first_common].color = "yellow"
-            self.points[last_common].color = "yellow"
-
-            if first_hull_common < last_hull_common:
-                area1 = calculate_polygon_area(hull[first_hull_common:last_hull_common])
-                area2 = calculate_polygon_area(hull[last_hull_common:] + hull[:first_hull_common])
-                if(area1 > area2):
-                    new_points=hull[first_hull_common:last_hull_common]
-                else:
-                    new_points=hull[last_hull_common:] + hull[:first_hull_common]
+        for land in land_to_grow:
+            print(land.color)
+            print(land.points)
+        if(len(land_to_grow)==1):
+            if land_to_grow[0].color == mapEditor.color:
+                print(len(land_to_grow))
+                land_to_grow[0].grow_land(hull,points_inside)
             else:
-                area1 = calculate_polygon_area(hull[last_hull_common:first_hull_common])
-                area2 = calculate_polygon_area(hull[first_hull_common:] + hull[:last_hull_common])
-                if(area1 > area2):
-                    new_points=hull[last_hull_common:first_hull_common]
+                land = Land(hull,mapEditor.color)
+                land.mini_grow(land_to_grow[0].points.copy(),points_inside)
+                mapEditor.add_land(land)
+
+        else:
+            print("len(land_to_grow)")
+            print(len(land_to_grow))
+            new_land = Land(hull,mapEditor.color)
+            for land in land_to_grow:
+                if land.color == mapEditor.color:
+                    new_land.grow_land(land.points.copy(),points_inside)
+                    mapEditor.remove_lands([land])
                 else:
-                    new_points=hull[first_hull_common:] + hull[:last_hull_common]
+                    new_land.mini_grow(land.points.copy(),points_inside)
 
-            self.points = [i for i in self.points if i not in common_points]
-            for point in reversed(new_points):
-                self.points.insert(first_common,point)
-            self.lines = []
-            for i in range(len(self.points)):
-                self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
-
-
-            # area1 = calculate_polygon_area(self.points[first_common + 1:last_common])
-            # area2 = calculate_polygon_area(self.points[last_common + 1:first_common])
-            # if(area1 > area2):
-            #     print("area1")
-            #     for point in self.points[first_common + 1:last_common]:
-            #         point.color="pink"
-            #     for point in self.points[last_common + 1:first_common]:
-            #         point.color="brown"
-            # else:
-            #     print("area2")
-            #     for point in self.points[first_common + 1:last_common]:
-            #         point.color="brown"
-            #     for point in self.points[last_common + 1:first_common]:
-            #         point.color="pink"
-            #
-            # area1 = calculate_polygon_area(hull[first_hull_common + 1:last_hull_common])
-            # area2 = calculate_polygon_area(hull[last_hull_common + 1:first_hull_common])
-            # if(area1 > area2):
-            #     for point in hull[first_hull_common + 1:last_hull_common]:
-            #         point.color="pink"
-            #     for point in hull[last_hull_common + 1:first_hull_common]:
-            #         point.color="brown"
-            # else:
-            #     for point in hull[first_hull_common + 1:last_hull_common]:
-            #         point.color="brown"
-            #     for point in hull[last_hull_common + 1:first_hull_common]:
-            #         point.color="pink"
+            mapEditor.add_land(new_land)
 
 
 
-
-            #self.points.insert(first_common,)
-
-            # new_points = hull[:first_hull_common + 1]+hull[last_hull_common-1:]
-            # new_points = hull[first_hull_common + 1:]+hull[:last_hull_common-1]
-            # new_points = []
-            #
-            #
-            # # Points from self.points before first_common
-            # new_points.extend(self.points[:first_common + 1])
-            #
-            # # Determine which segment of hull to add (either clockwise or counterclockwise)
-            # # if first_hull_common < last_hull_common:
-            # #     new_points.extend(hull[first_hull_common + 1:last_hull_common])
-            # # else:
-            # #     new_points.extend(hull[first_hull_common + 1:] + hull[:last_hull_common])
-            #
-            # # Points from self.points after last_common
-            # new_points.extend(self.points[last_common:])
-            #
-            # self.points = new_points
-            #
-            #
-            # self.lines = []
-            # for i in range(len(self.points)):
-            #     self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
-
-
-        # if len(common_points) == 2:
-        #     print("doing 2")
-        #     first_common = self.points.index(common_points[0])
-        #     last_common = self.points.index(common_points[-1])
-        #     # first_common2 = hull.index(common_points[0])
-        #     # last_common2 = hull.index(common_points[-1])
-        #
-        #     self.points[first_common].color="yellow"
-        #     self.points[last_common].color="yellow"
-        #
-        #     for point in self.points[:first_common +1]:
-        #         point.color="pink"
-        #
-        #     for point in self.points[last_common: -1]:
-        #         point.color="brown"
-        #
-        #     new_points = hull[hull_common :] + hull[:hull_common]
-        #
-        #     self.points = self.points[:first_common + 1] + new_points + self.points[last_common:]
-        #
-        #     self.lines = []
-        #     for i in range(len(self.points)):
-        #         self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
-
-        # if len(common_points) == 1 or len(common_points) == 2:
-        #     for point in hull:
-        #         if point not in self.points:
-        #             index = self.points.index(common_points[-1]) + 1
-        #             self.points.insert(index, point)
-        #     self.lines = []
-        # else:
-        #     first_common = self.points.index(common_points[0])
-        #     last_common = self.points.index(common_points[-1])
-        #     first_common.color ="yellow"
-        #     last_common.color ="yellow"
-        #
-        #     new_points = []
-        #     for point in hull:
-        #         print("point.x:")
-        #         print(point.x)
-        #         if point not in self.points:
-        #             new_points.append(point)
-        #
-        #     self.points = self.points[:first_common + 1] + new_points + self.points[last_common: -1]
-        #
-        # self.lines = []
-        # for i in range(len(self.points)):
-        #     self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)]))
-
-
-# def convex_hull(points,mapEditor):
-#     n = len(points)
-#     if n < 3:
-#         return "Za mało punktów"
-#
-#
-#     points.sort(key=lambda point: point.x)
-#
-#     lower_hull = []
-#     for point in points:
-#         while len(lower_hull) >= 2 and orientation(lower_hull[-2], lower_hull[-1], point) != 2:
-#             lower_hull.pop()
-#         lower_hull.append(point)
-#
-#     upper_hull = []
-#     for point in reversed(points):
-#         while len(upper_hull) >= 2 and orientation(upper_hull[-2], upper_hull[-1], point) != 2:
-#             upper_hull.pop()
-#         upper_hull.append(point)
-#
-#     upper_hull.pop()
-#
-#     hull = lower_hull + upper_hull
-#
-#     for point in hull:
-#         point.color="green"
-#         mapEditor.add_point(point)
-#
-#     for i in range(len(hull)):
-#         mapEditor.add_line(hull[i], hull[(i + 1) % len(hull)])
 
 
 class MapEditor:
     def __init__(self):
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.points = []
-        #self.lines = []
+        self.mode="write"
+        self.color="red"
         self.lands=[]
         self.plot_size = 1000
         self.search_range=100
@@ -382,16 +349,41 @@ class MapEditor:
         self.last_clicked_x=None
         self.last_clicked_y=None
         self.map_coverage = []
-
+        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 
-    # def add_line(self, p1, p2):
-    #     self.lines.append(Line(p1, p2))
+    def on_key_press(self, event):
+        if event.key == '1':
+            self.color="red"
+            print("red")
+        if event.key == '2':
+            self.color="blue"
+            print("blue")
+        if event.key == '3':
+            self.color="green"
+            print("green")
+        if event.key == '4':
+            self.color="yellow"
+            print("yellow")
+        if event.key == 'd':
+            print("deletion mode")
+            self.mode="delete"
+        if event.key == 'w':
+            print("write mode")
+            self.mode="write"
+
 
     def add_point(self, p):
         self.points.append(p)
+
+    def remove_lands(self, lands_to_remove):
+        self.lands = [land for land in self.lands if land not in lands_to_remove]
+
     def add_land(self,land):
         self.lands.append(land)
+
+
+
     def create_map_area(self, x, y):
         area_size = self.plot_size / self.rows
         adjacent_areas = []
@@ -407,58 +399,83 @@ class MapEditor:
         return adjacent_areas
 
     def onclick(self, event):
-        if event.inaxes == self.ax and event.button == 3:
-            clicked_x, clicked_y = event.xdata, event.ydata
-            half_plot_size = self.plot_size / 2
-            if(self.last_clicked_x is None and self.last_clicked_y is None):
-                if((abs(clicked_x) > half_plot_size or abs(clicked_y) > half_plot_size)):
+        if self.mode == "delete":
+            if event.inaxes == self.ax and event.button == 3:
+                clicked_x, clicked_y = event.xdata, event.ydata
+                new_point = Point(clicked_x, clicked_y, "blue")
+                for land in self.lands:
+                    for point in land.points:
+                        distance = new_point.distance_from_other_point(point)
+                        if distance <= self.search_range/10:
+                            land.delete_point(point)
+            self.update_map()
+        if self.mode == "write":
+            if event.inaxes == self.ax and event.button == 3:
+                clicked_x, clicked_y = event.xdata, event.ydata
+                half_plot_size = self.plot_size / 3
+                if(self.last_clicked_x is None and self.last_clicked_y is None):
+                    if((abs(clicked_x) > half_plot_size or abs(clicked_y) > half_plot_size)):
+                        self.last_clicked_x = clicked_x
+                        self.last_clicked_y = clicked_y
+                elif( abs(self.last_clicked_x - clicked_x) > half_plot_size or abs(self.last_clicked_y - clicked_y) > half_plot_size):
                     self.last_clicked_x = clicked_x
                     self.last_clicked_y = clicked_y
-            elif( abs(self.last_clicked_x - clicked_x) > half_plot_size or abs(self.last_clicked_y - clicked_y) > half_plot_size):
-                self.last_clicked_x = clicked_x
-                self.last_clicked_y = clicked_y
 
 
-            for i in range(math.floor((clicked_x - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_x + self.search_range) / (self.plot_size / self.rows))+1):
-                for j in range(math.floor((clicked_y - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_y + self.search_range) / (self.plot_size / self.rows))+1):
-                    adjacent_areas = self.create_map_area(i, j)
-                    for area in adjacent_areas:
-                        new_points = area.generate_points(10, self.plot_size / self.rows, "red")
-                        self.points.extend(new_points)
+                for i in range(math.floor((clicked_x - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_x + self.search_range) / (self.plot_size / self.rows))+1):
+                    for j in range(math.floor((clicked_y - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_y + self.search_range) / (self.plot_size / self.rows))+1):
+                        adjacent_areas = self.create_map_area(i, j)
+                        for area in adjacent_areas:
+                            new_points = area.generate_points(10, self.plot_size / self.rows, "black")
+                            self.points.extend(new_points)
 
 
-            new_point = Point(clicked_x, clicked_y, "blue")
-            points_to_do=[]
+                new_point = Point(clicked_x, clicked_y, self.color)
+                points_to_do=[]
 
-            for point in self.points:
-                distance = new_point.distance_from_other_point(point)
-                if distance <= self.search_range:
-                    points_to_do.append(point)
-
-            has_land_point = False
-            land_found=[]
-            for land in self.lands:
-                for point in land.points:
+                for point in self.points:
                     distance = new_point.distance_from_other_point(point)
                     if distance <= self.search_range:
-                        point.color="black"
                         points_to_do.append(point)
-                        land_found.append(land)
-                        has_land_point = True
+
+                has_land_point = False
+                land_found=[]
+                points_inside=[]
+                for land in self.lands:
+
+                    for point in land.points:
+                        distance = new_point.distance_from_other_point(point)
+                        if distance <= self.search_range:
+                            points_inside.append(point)
+                            point.color="black"
+                            points_to_do.append(point)
+                            has_land_point = True
+                            if land in land_found:
+                                continue
+                            land_found.append(land)
 
 
-            if not has_land_point:
-                #self.lines=[]
-                jarvis_marszuje(points_to_do,self)
-            else:
-                jarvis_marszuje(points_to_do,self,land_found)
 
-            for point in points_to_do:
-                if point in self.points:
-                    self.points.remove(point)
+                if not has_land_point:
+                    jarvis_marszuje(points_to_do,self)
+                else:
+                    jarvis_marszuje(points_to_do,self,land_found,points_inside)
 
+                for point in points_to_do:
+                    if point in self.points:
+                        self.points.remove(point)
+                # print("first print")
+                # for land in self.lands:
+                #     print(land.points)
+                # for land in land_found:
+                #     if land in self.lands:
+                #         print(land.points)
+                        # self.lands.remove(land)
+                # print("printed")
+                # for land in self.lands:
+                #     print(land.points)
 
-            self.update_map()
+                self.update_map()
 
     def update_map(self):
         self.ax.clear()
@@ -472,7 +489,8 @@ class MapEditor:
             self.ax.set_ylim(0, 1000)
         for land in self.lands:
             for line in land.lines:
-                plt.plot([line.p1.x, line.p2.x], [line.p1.y, line.p2.y], 'r-', marker='o')
+
+                plt.plot([line.p1.x, line.p2.x], [line.p1.y, line.p2.y], color=line.color)
 
             for point in land.points:
                 self.ax.plot(point.x, point.y, 'o', color=point.color)
