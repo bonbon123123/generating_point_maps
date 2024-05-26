@@ -29,7 +29,7 @@ class Line:
     def __repr__(self):
         return f"Points({self.p1}, {self.p2})"
     def intersects(self, other):
-        
+
         def orientation(p, q, r):
             val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
             if val == 0:
@@ -74,7 +74,7 @@ class Line:
         return False
 
     def intersection_point(self, other):
-        
+
         def line_intersection(p1, p2, p3, p4):
             A1 = p2.y - p1.y
             B1 = p1.x - p2.x
@@ -84,7 +84,7 @@ class Line:
             C2 = A2 * p3.x + B2 * p3.y
             det = A1 * B2 - A2 * B1
             if det == 0:
-                return None  
+                return None
             else:
                 x = (B2 * C1 - B1 * C2) / det
                 y = (A1 * C2 - A2 * C1) / det
@@ -147,37 +147,54 @@ class Land:
 
 
     def delete_point(self,point):
-        print("deleting")
         self.points.remove(point)
         self.points = sort_points(self.points)
         self.update_lines()
 
-    def my_points(self,points):
-        return  [point for point in self.points if point in points]
 
-    def mini_grow(self, hull, points):
-        mutual_points = set(points) & set(hull)
-        combined_points = list(set(self.points.copy() + list(mutual_points)))
-        self.points = sort_points(combined_points)
+    def mini_grow(self, other_land, points_inside):
+        points_set = set(self.points)
+        other_land_points_set = set(other_land.points)
+        points_inside_set = set(points_inside)
+
+        mutual_points = other_land_points_set & points_inside_set
+
+        intersection_points = points_set & other_land_points_set
+
+        final_points = list(points_set | mutual_points | intersection_points)
+
+        self.points = sort_points(final_points)
+
+
         for point in self.points:
             point.color = self.color
+
         self.update_lines()
 
 
-    def grow_land(self, hull, points_insie):
+
+    def grow_land(self, hull, points_inside,other_lands=None):
+        print("grow land")
+        points_for_hull=[]
+        if (other_lands):
+            for land in other_lands:
+                if land.color!=self.color:
+                    for point in land.points:
+                        if point in points_inside or point in self.points or point in hull:
+
+                            points_for_hull.append(point)
         combined_points = list(set(self.points.copy() + hull.copy()))
         mutual_points = set(self.points) & set(hull)
         unique_points =  [point for point in combined_points if point not in mutual_points]
-        uniquer_points =  [point for point in unique_points if point not in points_insie]
+        unique_points = list(set(unique_points + points_for_hull))
+        uniquer_points =  [point for point in unique_points if point not in [point for point in points_inside if point not in points_for_hull]]
+
+
         self.points = sort_points(uniquer_points)
         for point in self.points:
             point.color=self.color
         self.update_lines()
 
-def merge_lands(land1, land2):
-    hull_points = sort_points(list(set(land1.points + land2.points)))
-    merged_land = Land(hull_points, land1.color)
-    return merged_land
 
 
 def sort_points(points):
@@ -216,16 +233,19 @@ def sort_points(points):
         banned_points=[]
 
 
+
         while len(sorted_points) < len(points) - len(banned_points):
             sorted_points.append(current_point)
             used_points.add(current_point)
-            next_p = next_point(current_point, points, used_points)
+            found_better_point=False
+            if found_better_point==False:
+                next_p = next_point(current_point, points, used_points)
             if next_p is None:
-                print("None")
                 current_point.failed_connections+=1
                 if(current_point).failed_connections==100:
+                    print("i ban")
                     banned_points.append(banned_points)
-                    points.remove(current_point)
+                    # points.remove(current_point)
                 i+=1
                 if(i>len(points)):
                     i=0
@@ -234,8 +254,10 @@ def sort_points(points):
 
             used_lines.append(Line(current_point, next_p))
             current_point = next_p
+
         thereIsIntersection=False
-        used_lines.append(Line(sorted_points[0],sorted_points[-1]))
+        # used_lines.append(Line(sorted_points[0],sorted_points[-1]))
+
         for line in used_lines:
             for line2 in used_lines:
                 if line.intersects(line2):
@@ -243,24 +265,8 @@ def sort_points(points):
                     banned_lines.append(line)
                     banned_lines.append(line2)
                     break
-        # total_length = sum(line.p1.distance_from_other_point(line.p2) for line in used_lines)
-        # sus_lines=[]
-        # average_length = total_length / len(used_lines)
-        # for line in used_lines:
-        #     if line.p1.distance_from_other_point(line.p2) > average_length*2:
-        #         print("sus_lines1")
-        #         sus_lines.append(line)
-        # if len(sus_lines)>=2:
-        #     thereIsIntersection=True
-        #     if(sus_lines[0].p2==sus_lines[1].p1):
-        #         points.remove(sus_lines[0].p2)
-        #     else:
-        #         index = sorted_points.index(sus_lines[0].p2)
-        #         index2 = sorted_points.index(sus_lines[-1].p1)
-        #         points_to_remove = sorted_points[:index +1] + sorted_points[index2-1:]
-        #         if len(points_to_remove) <4:
-        #             for point in points_to_remove:
-        #                 points.remove(point)
+
+
     return sorted_points
 
 
@@ -273,7 +279,6 @@ def sort_points(points):
 
 
 def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
-    print("aktywowany")
     n = len(points)
     if n < 3:
         return points
@@ -299,28 +304,22 @@ def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
         land = Land(hull,mapEditor.color)
         mapEditor.add_land(land)
     else:
-        for land in land_to_grow:
-            print(land.color)
-            print(land.points)
         if(len(land_to_grow)==1):
             if land_to_grow[0].color == mapEditor.color:
-                print(len(land_to_grow))
                 land_to_grow[0].grow_land(hull,points_inside)
             else:
                 land = Land(hull,mapEditor.color)
-                land.mini_grow(land_to_grow[0].points.copy(),points_inside)
+                land.mini_grow(land_to_grow[0],points_inside)
                 mapEditor.add_land(land)
 
         else:
-            print("len(land_to_grow)")
-            print(len(land_to_grow))
             new_land = Land(hull,mapEditor.color)
             for land in land_to_grow:
                 if land.color == mapEditor.color:
-                    new_land.grow_land(land.points.copy(),points_inside)
+                    new_land.grow_land(land.points.copy(),points_inside,land_to_grow)
                     mapEditor.remove_lands([land])
                 else:
-                    new_land.mini_grow(land.points.copy(),points_inside)
+                    new_land.mini_grow(land,points_inside)
 
             mapEditor.add_land(new_land)
 
@@ -468,7 +467,7 @@ class MapEditor:
                 # for land in land_found:
                 #     if land in self.lands:
                 #         print(land.points)
-                        # self.lands.remove(land)
+                # self.lands.remove(land)
                 # print("printed")
                 # for land in self.lands:
                 #     print(land.points)
