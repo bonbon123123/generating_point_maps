@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import sqrt
 import math
+import json
+
 import copy
 class Point:
     def __init__(self, x, y, color):
@@ -324,6 +326,20 @@ def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
             mapEditor.add_land(new_land)
 
 
+def save_lands_to_file(lands, filename):
+    """
+    Zapisuje landy do pliku tekstowego jako zbiór obiektów w formacie JSON.
+    """
+    land_data = []
+    for land in lands:
+        land_dict = {
+            "color": land.color,
+            "points": [(point.x, point.y) for point in land.points]
+        }
+        land_data.append(land_dict)
+
+    with open(filename, 'w') as file:
+        json.dump(land_data, file)
 
 
 
@@ -496,6 +512,9 @@ class MapEditor:
         #
         for point in self.points:
             self.ax.plot(point.x, point.y, 'o', color=point.color)
+
+        save_lands_to_file(map_editor.lands, "lands_data.txt")
+
 
         self.ax.set_title('Mapa z dodanymi punktami i obszarami')
         self.ax.set_aspect('equal')
