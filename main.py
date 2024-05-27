@@ -6,6 +6,8 @@ import json
 import copy
 from matplotlib.patches import Polygon
 from tkinter import ttk
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class Point:
@@ -198,7 +200,7 @@ class Land:
         unique_points = list(set(unique_points + points_for_hull))
         uniquer_points = [
             point for point in unique_points if point not in
-            [point for point in points_inside if point not in points_for_hull]
+                                                [point for point in points_inside if point not in points_for_hull]
         ]
 
         self.points = sort_points(uniquer_points)
@@ -225,8 +227,8 @@ def sort_points(points):
                     if len(banned_lines) > 0:
                         for line in banned_lines:
                             if (next_p is not None) and (
-                                (line.p1 == p and line.p2 == next_p) or
-                                (line.p2 == p and line.p1 == next_p)):
+                                    (line.p1 == p and line.p2 == next_p) or
+                                    (line.p2 == p and line.p1 == next_p)):
                                 valid = False
                                 break
                     if valid:
@@ -343,9 +345,9 @@ def save_lands_to_file(lands, filename):
 
 
 class MapEditor:
-
-    def __init__(self):
-        self.fig, self.ax = plt.subplots(figsize=(10, 10))
+    def __init__(self, root):
+        self.root = root
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))
         self.points = []
         self.mode = "write"
         self.color = "red"
@@ -362,11 +364,52 @@ class MapEditor:
         self.last_clicked_x = None
         self.last_clicked_y = None
         self.map_coverage = []
-        self.undo_stack = []
+        self.undo_stack=[]
 
-        self.cid_key = self.fig.canvas.mpl_connect('key_press_event',self.on_key_press)
-        self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
+        self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=10)
 
+        self.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.canvas.mpl_connect('button_press_event', self.onclick)
+
+        # Dodanie panelu kontrolnego obok wykresu
+        self.control_panel = ttk.Frame(self.root)
+        self.control_panel.grid(row=0, column=1, sticky='ns')
+
+        # Konfiguracja wierszy i kolumn
+        self.control_panel.columnconfigure(0, weight=1)
+
+        for i in range(7):
+            self.control_panel.rowconfigure(i, weight=1)
+
+        font_settings = ('Helvetica', 14)
+
+        ttk.Label(self.control_panel, text="Controls", font=font_settings).grid(row=0, column=0, pady=10, sticky='ew')
+
+        ttk.Button(self.control_panel, text="Red", command=lambda: self.change_color("red"), style="TButton").grid(
+            row=1, column=0, pady=5, sticky='ew')
+        ttk.Button(self.control_panel, text="Blue", command=lambda: self.change_color("blue"), style="TButton").grid(
+            row=2, column=0, pady=5, sticky='ew')
+        ttk.Button(self.control_panel, text="Green", command=lambda: self.change_color("green"), style="TButton").grid(
+            row=3, column=0, pady=5, sticky='ew')
+        ttk.Button(self.control_panel, text="Yellow", command=lambda: self.change_color("yellow"),
+                   style="TButton").grid(row=4, column=0, pady=5, sticky='ew')
+
+        ttk.Button(self.control_panel, text="Write Mode", command=self.set_write_mode, style="TButton").grid(row=5,
+                                                                                                             column=0,
+                                                                                                             pady=10,
+                                                                                                             sticky='ew')
+        ttk.Button(self.control_panel, text="Delete Mode", command=self.set_delete_mode, style="TButton").grid(row=6,
+                                                                                                               column=0,
+                                                                                                               pady=10,
+                                                                                                               sticky='ew')
+        ttk.Button(self.control_panel, text="Undo", command=self.undo(), style="TButton").grid(row=6,
+                                                                                               column=0,
+                                                                                               pady=10,
+                                                                                               sticky='ew')
+        # Stylizacja przycisków
+        style = ttk.Style()
+        style.configure("TButton", font=font_settings, anchor='center')
     def on_key_press(self, event):
         if event.key == '1':
             self.color = "red"
@@ -544,11 +587,19 @@ class MapEditor:
         self.ax.set_aspect('equal')
         self.fig.canvas.draw()
 
+    def change_color(self, color):
+        self.color = color
+        print(f"Color changed to {color}")
+
+    def set_write_mode(self):
+        self.mode = "write"
+        print("Mode changed to write")
+
+    def set_delete_mode(self):
+        self.mode = "delete"
+        print("Mode changed to delete")
 
 if __name__ == "__main__":
-
-
-
     print("Witaj w edytorze mapy!")
     print("Wybierz opcję:")
     print("1 Red")
@@ -559,5 +610,8 @@ if __name__ == "__main__":
     print("w Write")
     print("c Undo")
     print("s Save")
-    map_editor = MapEditor()
-    plt.show()
+    root = tk.Tk()
+    root.title("Map Editor")
+    root.geometry("1000x800")
+    app = MapEditor(root)
+    root.mainloop()
