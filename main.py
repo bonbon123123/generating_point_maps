@@ -3,33 +3,42 @@ import numpy as np
 from math import sqrt
 import math
 import json
-
 import copy
+from matplotlib.patches import Polygon
+from tkinter import ttk
+
+
 class Point:
+
     def __init__(self, x, y, color):
         self.x = x
         self.y = y
         self.color = color
-        self.failed_connections=0
+        self.failed_connections = 0
 
     def distance_from_other_point(self, other_point):
-        return sqrt((self.x - other_point.x) ** 2 + (self.y - other_point.y) ** 2)
-
+        return sqrt((self.x - other_point.x)**2 + (self.y - other_point.y)**2)
 
     def __hash__(self):
         return hash((self.x, self.y))
+
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
+
     def __repr__(self):
         return f"Point({self.x}, {self.y})"
 
+
 class Line:
-    def __init__(self, point1, point2,color="red"):
+
+    def __init__(self, point1, point2, color="red"):
         self.p1 = point1
         self.p2 = point2
-        self.color=color
+        self.color = color
+
     def __repr__(self):
         return f"Points({self.p1}, {self.p2})"
+
     def intersects(self, other):
 
         def orientation(p, q, r):
@@ -39,8 +48,8 @@ class Line:
             return 1 if val > 0 else 2
 
         def on_segment(p, q, r):
-            if (q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x) and
-                    q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y)):
+            if (q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x)
+                    and q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y)):
                 return True
             return False
 
@@ -49,13 +58,13 @@ class Line:
         o3 = orientation(other.p1, other.p2, self.p1)
         o4 = orientation(other.p1, other.p2, self.p2)
 
-        if self.p1==other.p1:
+        if self.p1 == other.p1:
             return False
-        if self.p1==other.p2:
+        if self.p1 == other.p2:
             return False
-        if self.p2==other.p1:
+        if self.p2 == other.p1:
             return False
-        if self.p2==other.p2:
+        if self.p2 == other.p2:
             return False
 
         if o1 != o2 and o3 != o4:
@@ -90,11 +99,13 @@ class Line:
             else:
                 x = (B2 * C1 - B1 * C2) / det
                 y = (A1 * C2 - A2 * C1) / det
-                return Point(x, y,"yellow")
+                return Point(x, y, "yellow")
 
         return line_intersection(self.p1, self.p2, other.p1, other.p2)
 
+
 class MapArea:
+
     def __init__(self, x, y, size):
         self.x = x
         self.y = y
@@ -102,11 +113,13 @@ class MapArea:
         self.points_generated = False
         self.points = []
 
-    def generate_points(self, num_points, area_size,color):
+    def generate_points(self, num_points, area_size, color):
         if not self.points_generated:
             for _ in range(num_points):
-                point_x = np.random.randint(self.x*self.size  , (self.x+1)*self.size)
-                point_y = np.random.randint(self.y*self.size  , (self.y+1)*self.size)
+                point_x = np.random.randint(self.x * self.size,
+                                            (self.x + 1) * self.size)
+                point_y = np.random.randint(self.y * self.size,
+                                            (self.y + 1) * self.size)
                 self.points.append(Point(point_x, point_y, color))
             self.points_generated = True
 
@@ -123,36 +136,32 @@ def orientation(p, q, r):
     return 1 if val > 0 else -1
 
 
-
-
-
-
 class Land:
-    def __init__(self, points,color):
-        self.color=color
+
+    def __init__(self, points, color):
+        self.color = color
         self.points = points
         for point in self.points:
-            point.color=self.color
+            point.color = self.color
         self.lines = []
         for i in range(len(points)):
-            self.lines.append(Line(points[i], points[(i + 1) % len(points)],self.color))
-
+            self.lines.append(
+                Line(points[i], points[(i + 1) % len(points)], self.color))
 
     def add_line(self, line):
         self.lines.append(line)
 
-
     def update_lines(self):
         self.lines = []
         for i in range(len(self.points)):
-            self.lines.append(Line(self.points[i], self.points[(i + 1) % len(self.points)],self.color))
+            self.lines.append(
+                Line(self.points[i], self.points[(i + 1) % len(self.points)],
+                     self.color))
 
-
-    def delete_point(self,point):
+    def delete_point(self, point):
         self.points.remove(point)
         self.points = sort_points(self.points)
         self.update_lines()
-
 
     def mini_grow(self, other_land, points_inside):
         points_set = set(self.points)
@@ -167,41 +176,40 @@ class Land:
 
         self.points = sort_points(final_points)
 
-
         for point in self.points:
             point.color = self.color
 
         self.update_lines()
 
-
-
-    def grow_land(self, hull, points_inside,other_lands=None):
+    def grow_land(self, hull, points_inside, other_lands=None):
         print("grow land")
-        points_for_hull=[]
+        points_for_hull = []
         if (other_lands):
             for land in other_lands:
-                if land.color!=self.color:
+                if land.color != self.color:
                     for point in land.points:
                         if point in points_inside or point in self.points or point in hull:
-
                             points_for_hull.append(point)
         combined_points = list(set(self.points.copy() + hull.copy()))
         mutual_points = set(self.points) & set(hull)
-        unique_points =  [point for point in combined_points if point not in mutual_points]
+        unique_points = [
+            point for point in combined_points if point not in mutual_points
+        ]
         unique_points = list(set(unique_points + points_for_hull))
-        uniquer_points =  [point for point in unique_points if point not in [point for point in points_inside if point not in points_for_hull]]
-
+        uniquer_points = [
+            point for point in unique_points if point not in
+            [point for point in points_inside if point not in points_for_hull]
+        ]
 
         self.points = sort_points(uniquer_points)
         for point in self.points:
-            point.color=self.color
+            point.color = self.color
         self.update_lines()
 
 
-
 def sort_points(points):
-    banned_lines=[]
-    banned_points=[]
+    banned_lines = []
+    banned_points = []
     if not points:
         return []
 
@@ -209,13 +217,16 @@ def sort_points(points):
         min_distance = float('inf')
         next_p = None
         for p in points:
-            if (p != current_point) and (p not in used_points) and (p not in banned_points):
+            if (p != current_point) and (p not in used_points) and (
+                    p not in banned_points):
                 dist = current_point.distance_from_other_point(p)
                 if dist < min_distance:
                     valid = True
                     if len(banned_lines) > 0:
                         for line in banned_lines:
-                            if (next_p is not None) and ((line.p1 == p and line.p2 == next_p) or (line.p2 == p and line.p1 == next_p)):
+                            if (next_p is not None) and (
+                                (line.p1 == p and line.p2 == next_p) or
+                                (line.p2 == p and line.p1 == next_p)):
                                 valid = False
                                 break
                     if valid:
@@ -223,64 +234,52 @@ def sort_points(points):
                         next_p = p
         return next_p
 
-
     start_point = points[0]
-    i=0
-    thereIsIntersection=True
+    i = 0
+    thereIsIntersection = True
     while thereIsIntersection:
         used_points = set()
-        used_lines=[]
+        used_lines = []
         current_point = start_point
         sorted_points = []
-        banned_points=[]
-
-
+        banned_points = []
 
         while len(sorted_points) < len(points) - len(banned_points):
             sorted_points.append(current_point)
             used_points.add(current_point)
-            found_better_point=False
-            if found_better_point==False:
+            found_better_point = False
+            if found_better_point == False:
                 next_p = next_point(current_point, points, used_points)
             if next_p is None:
-                current_point.failed_connections+=1
-                if(current_point).failed_connections==100:
+                current_point.failed_connections += 1
+                if (current_point).failed_connections == 100:
                     print("i ban")
                     banned_points.append(banned_points)
                     # points.remove(current_point)
-                i+=1
-                if(i>len(points)):
-                    i=0
+                i += 1
+                if (i > len(points)):
+                    i = 0
                 start_point = points[i]
                 break
 
             used_lines.append(Line(current_point, next_p))
             current_point = next_p
 
-        thereIsIntersection=False
+        thereIsIntersection = False
         # used_lines.append(Line(sorted_points[0],sorted_points[-1]))
 
         for line in used_lines:
             for line2 in used_lines:
                 if line.intersects(line2):
-                    thereIsIntersection=True
+                    thereIsIntersection = True
                     banned_lines.append(line)
                     banned_lines.append(line2)
                     break
 
-
     return sorted_points
 
 
-
-
-
-
-
-
-
-
-def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
+def jarvis_marszuje(points, mapEditor, land_to_grow=None, points_inside=None):
     n = len(points)
     if n < 3:
         return points
@@ -302,26 +301,27 @@ def jarvis_marszuje(points,mapEditor,land_to_grow=None,points_inside=None):
         if p == leftmost_index:
             break
 
-    if land_to_grow==None:
-        land = Land(hull,mapEditor.color)
+    if land_to_grow == None:
+        land = Land(hull, mapEditor.color)
         mapEditor.add_land(land)
     else:
-        if(len(land_to_grow)==1):
+        if (len(land_to_grow) == 1):
             if land_to_grow[0].color == mapEditor.color:
-                land_to_grow[0].grow_land(hull,points_inside)
+                land_to_grow[0].grow_land(hull, points_inside)
             else:
-                land = Land(hull,mapEditor.color)
-                land.mini_grow(land_to_grow[0],points_inside)
+                land = Land(hull, mapEditor.color)
+                land.mini_grow(land_to_grow[0], points_inside)
                 mapEditor.add_land(land)
 
         else:
-            new_land = Land(hull,mapEditor.color)
+            new_land = Land(hull, mapEditor.color)
             for land in land_to_grow:
                 if land.color == mapEditor.color:
-                    new_land.grow_land(land.points.copy(),points_inside,land_to_grow)
+                    new_land.grow_land(land.points.copy(), points_inside,
+                                       land_to_grow)
                     mapEditor.remove_lands([land])
                 else:
-                    new_land.mini_grow(land,points_inside)
+                    new_land.mini_grow(land, points_inside)
 
             mapEditor.add_land(new_land)
 
@@ -342,60 +342,79 @@ def save_lands_to_file(lands, filename):
         json.dump(land_data, file)
 
 
-
 class MapEditor:
+
     def __init__(self):
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.points = []
-        self.mode="write"
-        self.color="red"
-        self.lands=[]
+        self.mode = "write"
+        self.color = "red"
+        self.lands = []
         self.plot_size = 1000
-        self.search_range=100
-        self.range_of_adding=1
+        self.search_range = 100
+        self.range_of_adding = 1
         self.ax.set_xlim(0, self.plot_size)
         self.ax.set_ylim(0, self.plot_size)
         self.ax.get_xaxis().set_visible(False)
         self.ax.get_yaxis().set_visible(False)
         self.ax.set_aspect('equal')
-        self.rows=10
-        self.last_clicked_x=None
-        self.last_clicked_y=None
+        self.rows = 10
+        self.last_clicked_x = None
+        self.last_clicked_y = None
         self.map_coverage = []
-        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.undo_stack = []
+
+        self.cid_key = self.fig.canvas.mpl_connect('key_press_event',self.on_key_press)
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 
     def on_key_press(self, event):
         if event.key == '1':
-            self.color="red"
+            self.color = "red"
             print("red")
         if event.key == '2':
-            self.color="blue"
+            self.color = "blue"
             print("blue")
         if event.key == '3':
-            self.color="green"
+            self.color = "green"
             print("green")
         if event.key == '4':
-            self.color="yellow"
+            self.color = "yellow"
             print("yellow")
         if event.key == 'd':
             print("deletion mode")
-            self.mode="delete"
+            self.mode = "delete"
         if event.key == 'w':
             print("write mode")
-            self.mode="write"
+            self.mode = "write"
+        if event.key == 'c':
+            print("undo")
+            self.undo()
 
+    def undo(self):
+        if len(self.undo_stack) > 0:
+            self.lands = self.undo_stack.pop()
+            self.update_map()
+            # Usuń niefizyczne punkty, które nie są przypisane do żadnego obszaru
+            self.points = [
+                point for point in self.points if not self.is_point_used(point)
+            ]
+
+    def is_point_used(self, point):
+        for land in self.lands:
+            if point in land.points:
+                return True
+        return False
 
     def add_point(self, p):
         self.points.append(p)
 
     def remove_lands(self, lands_to_remove):
-        self.lands = [land for land in self.lands if land not in lands_to_remove]
+        self.lands = [
+            land for land in self.lands if land not in lands_to_remove
+        ]
 
-    def add_land(self,land):
+    def add_land(self, land):
         self.lands.append(land)
-
-
 
     def create_map_area(self, x, y):
         area_size = self.plot_size / self.rows
@@ -403,9 +422,9 @@ class MapEditor:
 
         found = False
         for area in self.map_coverage:
-            if(area.x == x and area.y == y):
+            if (area.x == x and area.y == y):
                 found = True
-        if(not found):
+        if (not found):
             self.map_coverage.append(MapArea(x, y, area_size))
             adjacent_areas.append(MapArea(x, y, area_size))
 
@@ -419,32 +438,42 @@ class MapEditor:
                 for land in self.lands:
                     for point in land.points:
                         distance = new_point.distance_from_other_point(point)
-                        if distance <= self.search_range/10:
+                        if distance <= self.search_range / 10:
                             land.delete_point(point)
             self.update_map()
         if self.mode == "write":
             if event.inaxes == self.ax and event.button == 3:
                 clicked_x, clicked_y = event.xdata, event.ydata
                 half_plot_size = self.plot_size / 3
-                if(self.last_clicked_x is None and self.last_clicked_y is None):
-                    if((abs(clicked_x) > half_plot_size or abs(clicked_y) > half_plot_size)):
+                if (self.last_clicked_x is None
+                        and self.last_clicked_y is None):
+                    if ((abs(clicked_x) > half_plot_size
+                         or abs(clicked_y) > half_plot_size)):
                         self.last_clicked_x = clicked_x
                         self.last_clicked_y = clicked_y
-                elif( abs(self.last_clicked_x - clicked_x) > half_plot_size or abs(self.last_clicked_y - clicked_y) > half_plot_size):
+                elif (abs(self.last_clicked_x - clicked_x) > half_plot_size or
+                      abs(self.last_clicked_y - clicked_y) > half_plot_size):
                     self.last_clicked_x = clicked_x
                     self.last_clicked_y = clicked_y
 
-
-                for i in range(math.floor((clicked_x - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_x + self.search_range) / (self.plot_size / self.rows))+1):
-                    for j in range(math.floor((clicked_y - self.search_range) / (self.plot_size / self.rows)), math.floor((clicked_y + self.search_range) / (self.plot_size / self.rows))+1):
+                for i in range(
+                        math.floor((clicked_x - self.search_range) /
+                                   (self.plot_size / self.rows)),
+                        math.floor((clicked_x + self.search_range) /
+                                   (self.plot_size / self.rows)) + 1):
+                    for j in range(
+                            math.floor((clicked_y - self.search_range) /
+                                       (self.plot_size / self.rows)),
+                            math.floor((clicked_y + self.search_range) /
+                                       (self.plot_size / self.rows)) + 1):
                         adjacent_areas = self.create_map_area(i, j)
                         for area in adjacent_areas:
-                            new_points = area.generate_points(10, self.plot_size / self.rows, "black")
+                            new_points = area.generate_points(
+                                10, self.plot_size / self.rows, "black")
                             self.points.extend(new_points)
 
-
                 new_point = Point(clicked_x, clicked_y, self.color)
-                points_to_do=[]
+                points_to_do = []
 
                 for point in self.points:
                     distance = new_point.distance_from_other_point(point)
@@ -452,41 +481,33 @@ class MapEditor:
                         points_to_do.append(point)
 
                 has_land_point = False
-                land_found=[]
-                points_inside=[]
+                land_found = []
+                points_inside = []
                 for land in self.lands:
 
                     for point in land.points:
                         distance = new_point.distance_from_other_point(point)
                         if distance <= self.search_range:
                             points_inside.append(point)
-                            point.color="black"
+                            point.color = "black"
                             points_to_do.append(point)
                             has_land_point = True
                             if land in land_found:
                                 continue
                             land_found.append(land)
 
-
-
                 if not has_land_point:
-                    jarvis_marszuje(points_to_do,self)
+                    jarvis_marszuje(points_to_do, self)
                 else:
-                    jarvis_marszuje(points_to_do,self,land_found,points_inside)
+                    jarvis_marszuje(points_to_do, self, land_found,
+                                    points_inside)
 
                 for point in points_to_do:
                     if point in self.points:
                         self.points.remove(point)
-                # print("first print")
-                # for land in self.lands:
-                #     print(land.points)
-                # for land in land_found:
-                #     if land in self.lands:
-                #         print(land.points)
-                # self.lands.remove(land)
-                # print("printed")
-                # for land in self.lands:
-                #     print(land.points)
+
+                self.undo_stack.append(copy.deepcopy(
+                    self.lands))
 
                 self.update_map()
 
@@ -494,32 +515,49 @@ class MapEditor:
         self.ax.clear()
         if self.last_clicked_x is not None and self.last_clicked_y is not None:
             half_plot_size = self.plot_size / 2
-            self.ax.set_xlim(self.last_clicked_x - half_plot_size, self.last_clicked_x +half_plot_size)
-            self.ax.set_ylim(self.last_clicked_y - half_plot_size, self.last_clicked_y + half_plot_size)
-
+            self.ax.set_xlim(self.last_clicked_x - half_plot_size,
+                             self.last_clicked_x + half_plot_size)
+            self.ax.set_ylim(self.last_clicked_y - half_plot_size,
+                             self.last_clicked_y + half_plot_size)
         else:
             self.ax.set_xlim(0, 1000)
             self.ax.set_ylim(0, 1000)
+
         for land in self.lands:
             for line in land.lines:
+                plt.plot([line.p1.x, line.p2.x], [line.p1.y, line.p2.y],
+                         color=line.color)
 
-                plt.plot([line.p1.x, line.p2.x], [line.p1.y, line.p2.y], color=line.color)
+            # Wypełnienie obszaru land kolorem
+            land_points = [(point.x, point.y) for point in land.points]
+            polygon = Polygon(land_points,
+                              closed=True,
+                              edgecolor='none',
+                              facecolor=land.color,
+                              alpha=0.4)
+            self.ax.add_patch(polygon)
 
-            for point in land.points:
-                self.ax.plot(point.x, point.y, 'o', color=point.color)
-        # for line in self.lines:
-        #     plt.plot([line.p1.x, line.p2.x], [line.p1.y, line.p2.y], 'r-', marker='o')
-        #
         for point in self.points:
             self.ax.plot(point.x, point.y, 'o', color=point.color)
-
-        save_lands_to_file(map_editor.lands, "lands_data.txt")
-
 
         self.ax.set_title('Mapa z dodanymi punktami i obszarami')
         self.ax.set_aspect('equal')
         self.fig.canvas.draw()
 
+
 if __name__ == "__main__":
+
+
+
+    print("Witaj w edytorze mapy!")
+    print("Wybierz opcję:")
+    print("1 Red")
+    print("2 Blue")
+    print("3 Green")
+    print("4 Yellow")
+    print("d Delete")
+    print("w Write")
+    print("c Undo")
+    print("s Save")
     map_editor = MapEditor()
     plt.show()
